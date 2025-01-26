@@ -11,7 +11,7 @@ ZOOM           :: 2
 BG_COLOR       :: rl.BLACK
 TILE_SIZE      :: 16
 
-// Type Aliases
+// Type Aliases	    
 Vec2 :: rl.Vector2
 Rect :: rl.Rectangle
 
@@ -20,6 +20,14 @@ Game_State :: struct {
     camera:      rl.Camera2D,
     entities:    [dynamic]Entity,
     solid_tiles: [dynamic]rl.Rectangle,
+    spikes:      map[Entity_ID]Direction,
+}
+
+Direction :: enum {
+    Up,
+    Right,
+    Down,
+    Left
 }
 
 gs: Game_State
@@ -29,27 +37,69 @@ main :: proc() {
     rl.SetTargetFPS(60)
 
     gs.camera = rl.Camera2D { zoom = ZOOM }
-    player_id: int
+    player_id: Entity_ID
 
     // Set up our level
     {
-	data, ok := os.read_entire_file("../data/simple_level.dat")
+	level_data, ok := os.read_entire_file("../data/simple_level.dat")
 	assert(ok, "Failed to load level data")
 	x, y: f32
 
-	for v in data {
-	    if v == '\n' {
+	for v in level_data {
+	    switch v {
+	    case '\n':
 		y += TILE_SIZE
 		x = 0
 		continue
+	    case '#':
+		append(&gs.solid_tiles, Rect{x,y, TILE_SIZE, TILE_SIZE})
+	    case 'P':
+		player_id = entity_create(
+		    {x = x, y = y, width = 16, height = 38, move_speed = 280, jump_force = 650}
+		)
+	    case '^':
+		id := entity_create(
+		    Entity {
+			collider = Rect{x, y + SPIKE_DIFF, SPIKE_BREADTH, SPIKE_DEPTH},
+			on_enter = spike_on_enter,
+			flags = {.Kinematic, .Debug_Draw},
+			debug_color = rl.YELLOW
+		    }
+		)
+		gs.spikes[id] = .Up
+	    case 'v':
+		id := entity_create(
+		    Entity{
+			collider = Rect{x, y, SPIKE_BREADTH, SPIKE_DEPTH},
+			on_enter = spike_on_enter,
+			flags = {.Kinematic, .Debug_Draw},
+			debug_color = rl.YELLOW
+		    }
+		)
+		gs.spikes[id] = .Down
+	    case '>':
+		id := entity_create(
+		    Entity{
+			collider = Rect{x, y, SPIKE_DEPTH, SPIKE_BREADTH},
+			on_enter = spike_on_enter,
+			flags = {.Kinematic, .Debug_Draw},
+			debug_color = rl.YELLOW
+		    }
+		)
+		gs.spikes[id] = .Right
+	    case '<':
+		id := entity_create(
+		    Entity{
+			collider = Rect{x + SPIKE_DIFF, y, SPIKE_DEPTH, SPIKE_BREADTH},
+			on_enter = spike_on_enter,
+			flags = {.Kinematic, .Debug_Draw},
+			debug_color = rl.YELLOW
+		    }
+		)
+		gs.spikes[id] = .Left
 	    }
-	    if v == '#' {
-		append(&gs.solid_tiles, rl.Rectangle{x, y, TILE_SIZE, TILE_SIZE})
-	    }
-	    if v == 'P' {
-		player_id = entity_create({x = x, y = y, width = 16, height = 38, move_speed = 280, jump_force = 650})
-	    }
-	    x += TILE_SIZE
+	// move X to the next tile
+	x += TILE_SIZE
 	}
     }
 
@@ -62,11 +112,11 @@ main :: proc() {
 	input_x: f32
 	if rl.IsKeyDown(.D) do input_x += 1
 	if rl.IsKeyDown(.A) do input_x -= 1
-	if rl.IsKeyDown(.SPACE) && player.is_grounded {
+	if rl.IsKeyDown(.SPACE) && .Grounded in player.flags{
 	    player.vel.y = -player.jump_force
-	    player.is_grounded = false 
+	    player.flags -= {.Grounded}
 	}
-
+    
 	// Simulate
 	player.vel.x = input_x * player.move_speed
 	// [:] take the slice of our dynamic arrays
@@ -76,6 +126,13 @@ main :: proc() {
 	rl.BeginDrawing()
 	rl.BeginMode2D(gs.camera)
 	rl.ClearBackground(BG_COLOR)
+
+	// Debug Drawing
+	for e in gs.entities {
+	    if .Debug_Draw in e.flags {
+		rl.DrawRectangleLinesEx(e.collider, 1, e.debug_color)
+	    }
+	}
 	
 	// Create the map
 	for rect in gs.solid_tiles {
@@ -91,3 +148,4 @@ main :: proc() {
     }
 
 }
+

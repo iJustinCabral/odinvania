@@ -16,18 +16,20 @@ Vec2 :: rl.Vector2
 Rect :: rl.Rectangle
 
 // Types
-Player :: struct {
-    using collider: Rect,
-    vel:	    Vec2,
-    move_speed:     f32,
+Game_State :: struct {
+    camera:      rl.Camera2D,
+    entities:    [dynamic]Entity,
+    solid_tiles: [dynamic]rl.Rectangle,
 }
 
+gs: Game_State
 
 main :: proc() {
     rl.InitWindow(WINDOW_WIDTH, WINDOW_HEIGHT, "Odinvania")
+    rl.SetTargetFPS(60)
 
-    camera := rl.Camera2D { zoom = ZOOM }
-    solid_tiles: [dynamic]rl.Rectangle
+    gs.camera = rl.Camera2D { zoom = ZOOM }
+    player_id: int
 
     // Set up our level
     {
@@ -42,41 +44,49 @@ main :: proc() {
 		continue
 	    }
 	    if v == '#' {
-		append(&solid_tiles, rl.Rectangle{x, y, TILE_SIZE, TILE_SIZE})
+		append(&gs.solid_tiles, rl.Rectangle{x, y, TILE_SIZE, TILE_SIZE})
+	    }
+	    if v == 'P' {
+		player_id = entity_create({x = x, y = y, width = 16, height = 38, move_speed = 280, jump_force = 650})
 	    }
 	    x += TILE_SIZE
 	}
     }
 
-    // Initialize our player
-    player := Player{ x = 100, y = 100, width = 16, height = 38, move_speed = 280}
-
     for !rl.WindowShouldClose() {
 
 	// Input
 	dt := rl.GetFrameTime()
+	player := entity_get(player_id)
 
 	input_x: f32
 	if rl.IsKeyDown(.D) do input_x += 1
 	if rl.IsKeyDown(.A) do input_x -= 1
+	if rl.IsKeyDown(.SPACE) && player.is_grounded {
+	    player.vel.y = -player.jump_force
+	    player.is_grounded = false 
+	}
 
 	// Simulate
 	player.vel.x = input_x * player.move_speed
-	player.x += player.vel.x * dt
+	// [:] take the slice of our dynamic arrays
+	physics_update(gs.entities[:], gs.solid_tiles[:], dt)
 
 	// Render
 	rl.BeginDrawing()
-	rl.BeginMode2D(camera)
+	rl.BeginMode2D(gs.camera)
 	rl.ClearBackground(BG_COLOR)
-
-	for rect in solid_tiles {
+	
+	// Create the map
+	for rect in gs.solid_tiles {
 	    rl.DrawRectangleRec(rect, rl.WHITE)
 	    rl.DrawRectangleLinesEx(rect, 1, rl.GRAY)
 	}
 
+	// Draw the player
 	rl.DrawRectangleLinesEx(player.collider, 1, rl.GREEN)
 
-	defer rl.EndMode2D()
+	rl.EndMode2D()
 	defer rl.EndDrawing()
     }
 

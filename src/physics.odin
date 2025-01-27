@@ -7,6 +7,7 @@ import    "core:time"
 PHYSICS_ITERATIONS :: 8
 GRAVITY            :: 5
 TERMINAL_VELOCITY  :: 1200
+COLLISION_EPSILON  :: 0.01
 
 
 // First two parameters take a slice []T
@@ -63,6 +64,9 @@ physics_update :: proc(entities: []Entity, static_colliders: []Rect, dt: f32) {
 		    }
 		}
 
+		if entity.vel.x < 0 do entity.flags += {.Left}
+		if entity.vel.x > 0 do entity.flags -= {.Left}
+
 		// X Axis
 		entity.x += entity.vel.x * step
 		for static in static_colliders {
@@ -108,4 +112,25 @@ physics_update :: proc(entities: []Entity, static_colliders: []Rect, dt: f32) {
 	}
 
     }
+}
+
+raycast :: proc(start, magnitude: Vec2, targets: []Rect, allocator := context.temp_allocator) -> (hits: []Vec2, ok: bool) {
+    hit_store := make([dynamic]Vec2, allocator)
+
+    for t in targets {
+	p,q,r,s: Vec2 = {t.x, t.y}, {t.x, t.y + t.height}, {t.x + t.width, t.y + t.height}, {t.x + t.width, t.y}
+	lines := [4][2]Vec2{{p,q}, {q,r}, {r,s}, {s,p}}
+
+	for line in lines {
+	    point: Vec2
+	    if rl.CheckCollisionLines(start, start + magnitude, line[0], line[1], &point) {
+		append(&hit_store, point)
+	    }
+	}
+
+	color := len(hit_store) > 0 ? rl.GREEN : rl.YELLOW
+	debug_draw_line(start, start + magnitude, 1, color)
+    }
+
+    return hit_store[:], len(hit_store) > 0
 }

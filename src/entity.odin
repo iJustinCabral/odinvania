@@ -8,10 +8,11 @@ Entity :: struct {
     vel:	    Vec2,
     move_speed:     f32,
     jump_force:     f32,
-    on_enter, on_stay, on_exit: proc(self_id, other_id: Entity_ID),
+    debug_color:    rl.Color,
     entity_ids:     map[Entity_ID]time.Time,
     flags:          bit_set[Entity_Flags],
-    debug_color:     rl.Color,
+    behaviors:      bit_set[Entity_Behaviors],
+    on_enter, on_stay, on_exit: proc(self_id, other_id: Entity_ID),
     
 } 
 
@@ -20,9 +21,16 @@ Entity_ID :: distinct int
 
 Entity_Flags :: enum {
     Grounded,
+    Left,
     Dead,
     Kinematic,
     Debug_Draw,
+}
+
+Entity_Behaviors :: enum {
+    Walk,
+    Flip_At_Wall,
+    Flip_At_Edge,
 }
 
 entity_create :: proc(entity: Entity) -> Entity_ID {

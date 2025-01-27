@@ -51,6 +51,16 @@ main :: proc() {
 		player_id = entity_create(
 		    {x = x, y = y, width = 16, height = 38, move_speed = 280, jump_force = 650}
 		)
+	    case 'e':
+		entity_create(
+		    Entity{
+			collider = Rect{x,y, TILE_SIZE, TILE_SIZE},
+			move_speed = 50,
+			flags = {.Debug_Draw},
+			behaviors = {.Walk, .Flip_At_Wall, .Flip_At_Edge},
+			debug_color = rl.RED,
+		    }
+		)
 	    case '^':
 		id := entity_create(
 		    Entity {
@@ -115,6 +125,7 @@ main :: proc() {
 	player.vel.x = input_x * player.move_speed
 	// [:] take the slice of our dynamic arrays
 	physics_update(gs.entities[:], gs.solid_tiles[:], dt)
+	behavior_update(gs.entities[:], gs.solid_tiles[:], dt)
 
 	// Render
 	rl.BeginDrawing()

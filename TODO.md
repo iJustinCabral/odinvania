@@ -18,9 +18,9 @@
 *Added event handling for collision of entities  
 *Added spike hazard entity  
 *Enhanced debug drawing  
+*Added enemty behaviors  
 
 Implement command buffer  
-Add enemy behaviors  
 Health and safe zones  
 Implement Finite State Machine for animations  
 Integrate LDtk for 2D tile maps  

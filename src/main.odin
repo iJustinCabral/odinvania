@@ -17,17 +17,11 @@ Rect :: rl.Rectangle
 
 // Types
 Game_State :: struct {
-    camera:      rl.Camera2D,
-    entities:    [dynamic]Entity,
-    solid_tiles: [dynamic]rl.Rectangle,
-    spikes:      map[Entity_ID]Direction,
-}
-
-Direction :: enum {
-    Up,
-    Right,
-    Down,
-    Left
+    camera:       rl.Camera2D,
+    entities:     [dynamic]Entity,
+    solid_tiles:  [dynamic]rl.Rectangle,
+    spikes:       map[Entity_ID]Direction,
+    debug_shapes: [dynamic]Debug_Shape
 }
 
 gs: Game_State
@@ -143,8 +137,26 @@ main :: proc() {
 	// Draw the player
 	rl.DrawRectangleLinesEx(player.collider, 1, rl.GREEN)
 
+	for s in gs.debug_shapes {
+	    switch v in s {
+	    case Debug_Line:
+		rl.DrawLineEx(v.start, v.end, v.thickness, v.color)
+	    case Debug_Rect:
+		rl.DrawRectangleLinesEx(
+		    {v.pos.x, v.pos.y, v.size.x, v.size.y},
+		    v.thickness,
+		    v.color,
+		)
+	    case Debug_Circle:
+		rl.DrawCircleLinesV(v.pos, v.radius, v.color)
+	    }
+	}
+
+	rl.DrawFPS(20, 20)
+
 	rl.EndMode2D()
 	defer rl.EndDrawing()
+	clear(&gs.debug_shapes)
     }
 
 }

@@ -6,6 +6,13 @@ SPIKE_BREADTH :: 16
 SPIKE_DEPTH   :: 12
 SPIKE_DIFF    :: TILE_SIZE - SPIKE_DEPTH
 
+Direction :: enum {
+    Up,
+    Right,
+    Down,
+    Left
+}
+
 spike_on_enter :: proc(self_id, other_id: Entity_ID) {
     self := entity_get(self_id)
     assert(self != nil)

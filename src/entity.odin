@@ -8,6 +8,9 @@ Entity :: struct {
     vel:	    Vec2,
     move_speed:     f32,
     jump_force:     f32,
+    health:	    int,
+    max_health:     int,
+    on_hit_damage:  int,
     debug_color:    rl.Color,
     entity_ids:     map[Entity_ID]time.Time,
     flags:          bit_set[Entity_Flags],
@@ -23,6 +26,7 @@ Entity_Flags :: enum {
     Grounded,
     Left,
     Dead,
+    Immortal,
     Kinematic,
     Debug_Draw,
 }
@@ -51,4 +55,12 @@ entity_create :: proc(entity: Entity) -> Entity_ID {
 entity_get :: proc(id: Entity_ID) -> ^Entity {
     if int(id) >= len(gs.entities) { return nil }
     return &gs.entities[int(id)]
+}
+
+entity_update :: proc(entities: []Entity, dt: f32) {
+    for &e in entities {
+	if e.health == 0 && .Immortal not_in e.flags {
+	    e.flags += {.Dead}
+	}
+    }
 }

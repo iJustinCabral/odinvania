@@ -10,6 +10,11 @@ WINDOW_HEIGHT  :: 720
 ZOOM           :: 2
 BG_COLOR       :: rl.BLACK
 TILE_SIZE      :: 16
+UP             :: Vec2{0, -1}
+RIGHT          :: Vec2{1, 0}
+DOWN           :: Vec2{0, 1}
+LEFT           :: Vec2{-1, 0}
+PLAYER_SAFE_RESET_TIME :: 1
 
 // Type Aliases	    
 Vec2 :: rl.Vector2
@@ -17,11 +22,15 @@ Rect :: rl.Rectangle
 
 // Types
 Game_State :: struct {
-    camera:       rl.Camera2D,
-    entities:     [dynamic]Entity,
-    solid_tiles:  [dynamic]rl.Rectangle,
-    spikes:       map[Entity_ID]Direction,
-    debug_shapes: [dynamic]Debug_Shape
+    camera:                rl.Camera2D,
+    player_id:             Entity_ID,
+    safe_position:         Vec2,
+    safe_reset_timer:      f32,
+    player_uncontrollable: bool,
+    entities:              [dynamic]Entity,
+    solid_tiles:           [dynamic]rl.Rectangle,
+    spikes:                map[Entity_ID]Direction,
+    debug_shapes:          [dynamic]Debug_Shape
 }
 
 gs: Game_State
@@ -31,7 +40,6 @@ main :: proc() {
     rl.SetTargetFPS(60)
 
     gs.camera = rl.Camera2D { zoom = ZOOM }
-    player_id: Entity_ID
 
     // Set up our level
     {
@@ -48,8 +56,13 @@ main :: proc() {
 	    case '#':
 		append(&gs.solid_tiles, Rect{x,y, TILE_SIZE, TILE_SIZE})
 	    case 'P':
-		player_id = entity_create(
-		    {x = x, y = y, width = 16, height = 38, move_speed = 280, jump_force = 650}
+		gs.player_id = entity_create(
+		    {
+			x = x, y = y, width = 16, height = 38, move_speed = 280, jump_force = 650,
+			on_enter = player_on_enter,
+			health = 5,
+			max_health = 5
+		    }
 		)
 	    case 'e':
 		entity_create(
@@ -59,6 +72,9 @@ main :: proc() {
 			flags = {.Debug_Draw},
 			behaviors = {.Walk, .Flip_At_Wall, .Flip_At_Edge},
 			debug_color = rl.RED,
+			health = 2,
+			max_health = 2,
+			on_hit_damage = 1,
 		    }
 		)
 	    case '^':
@@ -66,8 +82,9 @@ main :: proc() {
 		    Entity {
 			collider = Rect{x, y + SPIKE_DIFF, SPIKE_BREADTH, SPIKE_DEPTH},
 			on_enter = spike_on_enter,
-			flags = {.Kinematic, .Debug_Draw},
-			debug_color = rl.YELLOW
+			flags = {.Kinematic, .Immortal, .Debug_Draw},
+			debug_color = rl.YELLOW,
+			on_hit_damage = 1
 		    }
 		)
 		gs.spikes[id] = .Up
@@ -76,8 +93,9 @@ main :: proc() {
 		    Entity{
 			collider = Rect{x, y, SPIKE_BREADTH, SPIKE_DEPTH},
 			on_enter = spike_on_enter,
-			flags = {.Kinematic, .Debug_Draw},
-			debug_color = rl.YELLOW
+			flags = {.Kinematic, .Immortal, .Debug_Draw},
+			debug_color = rl.YELLOW,
+			on_hit_damage = 1,
 		    }
 		)
 		gs.spikes[id] = .Down
@@ -86,8 +104,9 @@ main :: proc() {
 		    Entity{
 			collider = Rect{x, y, SPIKE_DEPTH, SPIKE_BREADTH},
 			on_enter = spike_on_enter,
-			flags = {.Kinematic, .Debug_Draw},
-			debug_color = rl.YELLOW
+			flags = {.Kinematic, .Immortal, .Debug_Draw},
+			debug_color = rl.YELLOW,
+			on_hit_damage = 1,
 		    }
 		)
 		gs.spikes[id] = .Right
@@ -96,8 +115,9 @@ main :: proc() {
 		    Entity{
 			collider = Rect{x + SPIKE_DIFF, y, SPIKE_DEPTH, SPIKE_BREADTH},
 			on_enter = spike_on_enter,
-			flags = {.Kinematic, .Debug_Draw},
-			debug_color = rl.YELLOW
+			flags = {.Kinematic, .Immortal, .Debug_Draw},
+			debug_color = rl.YELLOW,
+			on_hit_damage = 1,
 		    }
 		)
 		gs.spikes[id] = .Left
@@ -111,21 +131,59 @@ main :: proc() {
 
 	// Input
 	dt := rl.GetFrameTime()
-	player := entity_get(player_id)
+	player := entity_get(gs.player_id)
 
-	input_x: f32
-	if rl.IsKeyDown(.D) do input_x += 1
-	if rl.IsKeyDown(.A) do input_x -= 1
-	if rl.IsKeyDown(.SPACE) && .Grounded in player.flags{
-	    player.vel.y = -player.jump_force
-	    player.flags -= {.Grounded}
+	gs.safe_reset_timer -= dt
+	if gs.safe_reset_timer <= 0 {
+	    gs.player_uncontrollable = false 
 	}
-    
-	// Simulate
-	player.vel.x = input_x * player.move_speed
+
+	if !gs.player_uncontrollable {
+	    input_x: f32
+	    if rl.IsKeyDown(.D) do input_x += 1
+	    if rl.IsKeyDown(.A) do input_x -= 1
+	    if rl.IsKeyDown(.SPACE) && .Grounded in player.flags{
+		player.vel.y = -player.jump_force
+		player.flags -= {.Grounded}
+	    }
+	
+	    // Simulate
+	    player.vel.x = input_x * player.move_speed
+	}
+
 	// [:] take the slice of our dynamic arrays
+	entity_update(gs.entities[:], dt)
 	physics_update(gs.entities[:], gs.solid_tiles[:], dt)
 	behavior_update(gs.entities[:], gs.solid_tiles[:], dt)
+
+	if .Grounded in player.flags {
+	    pos := Vec2{player.x, player.y}
+	    size := Vec2{player.width, player.height}
+
+	    targets := make([dynamic]Rect, context.temp_allocator)
+	    for e, i in gs.entities {
+		if Entity_ID(i) == gs.player_id do continue
+		if .Dead not_in e.flags {
+		    append(&targets, e.collider)
+		}
+	    }
+
+	    safety_check: {
+		_, hit_ground_left := raycast(pos + {0, size.y}, DOWN * 2, gs.solid_tiles[:])
+		if !hit_ground_left do break safety_check
+
+		_, hit_ground_right := raycast(pos + size, DOWN * 2, gs.solid_tiles[:])
+		if !hit_ground_right do break safety_check
+
+		_, hit_entity_left := raycast(pos, LEFT * TILE_SIZE, targets[:])
+		if hit_entity_left do break safety_check
+
+		_, hit_entity_right := raycast(pos + {size.x, 0}, RIGHT * TILE_SIZE, targets[:])
+		if hit_entity_right do break safety_check
+
+		gs.safe_position = pos
+	    }
+	}
 
 	// Render
 	rl.BeginDrawing()
@@ -134,10 +192,11 @@ main :: proc() {
 
 	// Debug Drawing
 	for e in gs.entities {
-	    if .Debug_Draw in e.flags {
+	    if .Debug_Draw in e.flags && .Dead not_in e.flags {
 		rl.DrawRectangleLinesEx(e.collider, 1, e.debug_color)
 	    }
 	}
+	debug_draw_rect(gs.safe_position, {player.width, player.height}, 1, rl.BLUE)
 	
 	// Create the map
 	for rect in gs.solid_tiles {

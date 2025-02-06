@@ -42,6 +42,13 @@ Entity_Behaviors :: enum {
     Flip_At_Edge,
 }
 
+switch_animation :: proc(entity: ^Entity, name: string) {
+    entity.current_anim_name = name 
+    anim := entity.animations[name]
+    entity.animation_timer = anim.time
+    entity.current_anim_frame = anim.start
+}
+
 entity_create :: proc(entity: Entity) -> Entity_ID {
     for &e, i in gs.entities {
 	if .Dead in e.flags {

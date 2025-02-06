@@ -25,7 +25,8 @@ spike_on_enter :: proc(self_id, other_id: Entity_ID) {
 	other.y = gs.safe_position.y
 	other.vel = 0
 	gs.safe_reset_timer = PLAYER_SAFE_RESET_TIME
-	gs.player_uncontrollable = true
+	gs.player_movement_state = .Uncontrollable
+	switch_animation(other, "idle")
     }
 
     dir := gs.spikes[self_id]

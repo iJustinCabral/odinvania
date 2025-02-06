@@ -26,7 +26,7 @@ Game_State :: struct {
     player_id:             Entity_ID,
     safe_position:         Vec2,
     safe_reset_timer:      f32,
-    player_uncontrollable: bool,
+    player_movement_state: Player_Movement_State,
     entities:              [dynamic]Entity,
     solid_tiles:           [dynamic]rl.Rectangle,
     spikes:                map[Entity_ID]Direction,
@@ -88,6 +88,15 @@ main :: proc() {
 	time = 0.15,
     }
 
+    player_anim_run := Animation {
+	size = {120, 80},
+	offset = {52, 42},
+	start = 0,
+	end = 9,
+	row = 2,
+	time = 0.15,
+    }
+
 
     // Set up our level
     {
@@ -116,6 +125,7 @@ main :: proc() {
 			    "jump" = player_anim_jump,
 			    "jump_fall_inbetween" = player_anim_jump_fall_inbetween,
 			    "fall" = player_anim_fall,
+			    "run" = player_anim_run,
 			},
 			current_anim_name = "idle",
 		    }
@@ -189,34 +199,8 @@ main :: proc() {
 	dt := rl.GetFrameTime()
 	player := entity_get(gs.player_id)
 
-	gs.safe_reset_timer -= dt
-	if gs.safe_reset_timer <= 0 {
-	    gs.player_uncontrollable = false 
-	}
-
-	if !gs.player_uncontrollable {
-	    input_x: f32
-	    if rl.IsKeyDown(.D) do input_x += 1
-	    if rl.IsKeyDown(.A) do input_x -= 1
-	    if rl.IsKeyDown(.SPACE) && .Grounded in player.flags{
-		player.vel.y = -player.jump_force
-		player.flags -= {.Grounded}
-		player.current_anim_name = "jump"
-	    }
-
-	    if player.vel.y >= 0 {
-		if .Grounded not_in player.flags {
-		    player.current_anim_name = "fall"
-		} else {
-		    player.current_anim_name = "idle"
-		}
-	    }
-	
-	    // Simulate
-	    player.vel.x = input_x * player.move_speed
-	}
-
 	// [:] take the slice of our dynamic arrays
+	player_update(&gs, dt)
 	entity_update(gs.entities[:], dt)
 	physics_update(gs.entities[:], gs.solid_tiles[:], dt)
 	behavior_update(gs.entities[:], gs.solid_tiles[:], dt)
@@ -281,7 +265,6 @@ main :: proc() {
 		rl.DrawRectangleLinesEx(e.collider, 1, e.debug_color)
 	    }
 	}
-	debug_draw_rect(gs.safe_position, {player.width, player.height}, 1, rl.BLUE)
 	
 	// Create the map
 	for rect in gs.solid_tiles {
@@ -290,8 +273,6 @@ main :: proc() {
 	}
 
 	// Draw the player
-	rl.DrawRectangleLinesEx(player.collider, 1, rl.GREEN)
-
 	for s in gs.debug_shapes {
 	    switch v in s {
 	    case Debug_Line:

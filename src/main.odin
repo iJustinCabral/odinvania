@@ -33,6 +33,15 @@ Game_State :: struct {
     debug_shapes:          [dynamic]Debug_Shape
 }
 
+Animation :: struct {
+    size:   Vec2, // anim frame size 
+    offset: Vec2, // Line things up with collider
+    start:  int, // Start column (0 index)
+    end:    int, // Ending column (0 index)
+    row:    int, // Row (0 index)
+    time:   f32, // How long each frame takes 
+}
+
 gs: Game_State
 
 main :: proc() {
@@ -40,6 +49,45 @@ main :: proc() {
     rl.SetTargetFPS(60)
 
     gs.camera = rl.Camera2D { zoom = ZOOM }
+
+    player_texture := rl.LoadTexture("../assets/textures/player_sheet.png")
+    
+    player_anim_idle := Animation {
+	size = {120, 80},
+	offset = {52, 42},
+	start = 0,
+	end = 9,
+	row = 0,
+	time = 0.15
+    }
+
+    player_anim_jump := Animation {
+	size = {120, 80},
+	offset = {52, 42},
+	start = 0,
+	end = 2,
+	row = 1,
+	time = 0.15,
+    }
+
+    player_anim_jump_fall_inbetween := Animation {
+	size = {120, 80},
+	offset = {52, 42},
+        start = 3,
+	end = 4,
+	row = 1,
+	time = 0.15,
+    }
+
+    player_anim_fall := Animation {
+	size = {120, 80},
+	offset = {52, 42},
+	start = 5,
+	end = 7,
+	row = 1,
+	time = 0.15,
+    }
+
 
     // Set up our level
     {
@@ -61,7 +109,15 @@ main :: proc() {
 			x = x, y = y, width = 16, height = 38, move_speed = 280, jump_force = 650,
 			on_enter = player_on_enter,
 			health = 5,
-			max_health = 5
+			max_health = 5,
+			texture = &player_texture,
+			animations = {
+			    "idle" = player_anim_idle,
+			    "jump" = player_anim_jump,
+			    "jump_fall_inbetween" = player_anim_jump_fall_inbetween,
+			    "fall" = player_anim_fall,
+			},
+			current_anim_name = "idle",
 		    }
 		)
 	    case 'e':
@@ -145,6 +201,15 @@ main :: proc() {
 	    if rl.IsKeyDown(.SPACE) && .Grounded in player.flags{
 		player.vel.y = -player.jump_force
 		player.flags -= {.Grounded}
+		player.current_anim_name = "jump"
+	    }
+
+	    if player.vel.y >= 0 {
+		if .Grounded not_in player.flags {
+		    player.current_anim_name = "fall"
+		} else {
+		    player.current_anim_name = "idle"
+		}
 	    }
 	
 	    // Simulate
@@ -191,7 +256,27 @@ main :: proc() {
 	rl.ClearBackground(BG_COLOR)
 
 	// Debug Drawing
-	for e in gs.entities {
+	for &e in gs.entities {
+	    if e.texture != nil {
+		e.animation_timer -= dt
+
+		anim := e.animations[e.current_anim_name]
+
+		// Rectangle on texture (sprite sheet)
+		source := Rect {
+		    f32(e.current_anim_frame) * anim.size.x,
+		    f32(anim.row) * anim.size.y,
+		    anim.size.x,
+		    anim.size.y
+		}
+
+		if .Left in e.flags {
+		    source.width = -source.width // Flips the sprite when going left
+		}
+
+		rl.DrawTextureRec(e.texture^, source, {e.x, e.y} - anim.offset, rl.WHITE)
+	    }
+
 	    if .Debug_Draw in e.flags && .Dead not_in e.flags {
 		rl.DrawRectangleLinesEx(e.collider, 1, e.debug_color)
 	    }

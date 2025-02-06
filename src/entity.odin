@@ -5,13 +5,18 @@ import rl "vendor:raylib"
 
 Entity :: struct {
     using collider: Rect,
-    vel:	    Vec2,
-    move_speed:     f32,
-    jump_force:     f32,
-    health:	    int,
-    max_health:     int,
-    on_hit_damage:  int,
-    debug_color:    rl.Color,
+    vel:	        Vec2,
+    move_speed:         f32,
+    jump_force:         f32,
+    health:	        int,
+    max_health:         int,
+    on_hit_damage:      int,
+    debug_color:        rl.Color,
+    texture:            ^rl.Texture,
+    current_anim_name:  string,
+    current_anim_frame: int,
+    animation_timer:    f32,
+    animations:     map[string]Animation,
     entity_ids:     map[Entity_ID]time.Time,
     flags:          bit_set[Entity_Flags],
     behaviors:      bit_set[Entity_Behaviors],
@@ -61,6 +66,23 @@ entity_update :: proc(entities: []Entity, dt: f32) {
     for &e in entities {
 	if e.health == 0 && .Immortal not_in e.flags {
 	    e.flags += {.Dead}
+	}
+
+	if len(e.animations) > 0 {
+	    anim := e.animations[e.current_anim_name]
+
+	    // Switch Frames
+	    e.animation_timer -= dt
+	    if e.animation_timer <= 0 {
+		e.current_anim_frame += 1
+
+		// Loop, TODO: Reverse, Stop
+		if e.current_anim_frame > anim.end {
+		    e.current_anim_frame = anim.start 
+		}
+
+		e.animation_timer = anim.time
+	    }
 	}
     }
 }

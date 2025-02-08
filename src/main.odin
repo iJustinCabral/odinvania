@@ -167,7 +167,7 @@ main :: proc() {
 			flags = {.Debug_Draw},
 			behaviors = {.Walk, .Flip_At_Wall, .Flip_At_Edge},
 			debug_color = rl.RED,
-			health = 2,
+			health = 1,
 			max_health = 2,
 			on_hit_damage = 1,
 		    }
@@ -301,6 +301,7 @@ main :: proc() {
 	    rl.DrawRectangleLinesEx(rect, 1, rl.GRAY)
 	}
 
+	// Attack circle
 	debug_draw_circle(
 	    {player.collider.x, player.collider.y} +
 	    {.Left in player.flags ? -30 + player.collider.width : 30, 20},

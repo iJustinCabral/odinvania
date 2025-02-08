@@ -37,4 +37,30 @@ Add new player abilities
 Create a main menu scene  
 Impelement saving and loading  
 
+### -= 02/07/2025 =-
+
+**TODO: Fix attack anim callback (currently not killing entities)**
+
+*health and safe zones  
+*Implement finate state matchine for animations  
+*Load and draw animatmion tiles from sprite atalas  
+
+Implement command buffer  
+Health and safe zones  
+Implement Finite State Machine for animations  
+Integrate LDtk for 2D tile maps  
+Parse LDtk  
+Load and draw tiles from a srpite atlas for better performance  
+Implement camera bounds like 2D mario games  
+Load entities from placement on LDtk maps  
+Enemy hit feedback and animations  
+Add hards and obstacles  
+Sound effects and music integration  
+Player Health UI  
+Add checkpoints in levels  
+Add new player abilities  
+Create a main menu scene  
+Impelement saving and loading  
+
+
 

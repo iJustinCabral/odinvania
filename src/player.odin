@@ -1,6 +1,7 @@
 package game
 
 import rl "vendor:raylib"
+import "core:fmt"
 
 Player_Movement_State :: enum {
     Uncontrollable,
@@ -78,14 +79,19 @@ player_attack_callback :: proc(gs: ^Game_State, player: ^Entity) {
     center := Vec2{player.x, player.y}
     center += {.Left in player.flags ? -30 + player.collider.width : 30, 20}
 
+    fmt.print("DID ATTACK")
+
     for &e, idx in gs.entities {
 	id := Entity_ID(idx)
 	if id == gs.player_id do continue
 	if .Dead in e.flags do continue
 	if .Immortal in e.flags do continue
 
+	fmt.print(Entity_ID(idx))
+
 	if rl.CheckCollisionCircleRec(center, 25, e.collider) {
 	    entity_damage(Entity_ID(idx), 1)
+	    fmt.print("Did hit: ", Entity_ID(idx))
 	}
     }
 }

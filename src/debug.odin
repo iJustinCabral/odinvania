@@ -34,6 +34,6 @@ debug_draw_rect :: proc(pos, size: Vec2, thickness: f32, color: rl.Color) {
     append(&gs.debug_shapes, Debug_Rect{pos, size, thickness, color})
 }
 
-debug_draw_circle :: proc(pos, radius: Vec2, thickness: f32, color: rl.Color) {
+debug_draw_circle :: proc(pos, radius: Vec2, color: rl.Color) {
     append(&gs.debug_shapes, Debug_Circle{})
 }

@@ -44,9 +44,13 @@ Entity_Behaviors :: enum {
 
 switch_animation :: proc(entity: ^Entity, name: string) {
     entity.current_anim_name = name 
-    anim := entity.animations[name]
+    anim := &entity.animations[name] // Pointer to reset event timers
     entity.animation_timer = anim.time
     entity.current_anim_frame = anim.start
+
+    for &event in anim.timed_events {
+	event.timer = event.duration
+    }
 }
 
 entity_create :: proc(entity: Entity) -> Entity_ID {
@@ -69,8 +73,17 @@ entity_get :: proc(id: Entity_ID) -> ^Entity {
     return &gs.entities[int(id)]
 }
 
-entity_update :: proc(entities: []Entity, dt: f32) {
-    for &e in entities {
+entity_damage :: proc(id: Entity_ID, amount: int) {
+    entity := entity_get(id)
+    entity.health -= amount
+
+    if entity.health <= 0 {
+	entity.flags += {.Dead}
+    }
+}
+
+entity_update :: proc(gs: ^Game_State, dt: f32) {
+    for &e in gs.entities {
 	if e.health == 0 && .Immortal not_in e.flags {
 	    e.flags += {.Dead}
 	}
@@ -82,13 +95,35 @@ entity_update :: proc(entities: []Entity, dt: f32) {
 	    e.animation_timer -= dt
 	    if e.animation_timer <= 0 {
 		e.current_anim_frame += 1
+		e.animation_timer = anim.time
 
 		// Loop, TODO: Reverse, Stop
-		if e.current_anim_frame > anim.end {
-		    e.current_anim_frame = anim.start 
+		if .Loop in anim.flags {
+		    if e.current_anim_frame > anim.end {
+			e.current_anim_frame = anim.start
+		    }
+		}
+		else {
+		    if e.current_anim_frame > anim.end {
+			e.current_anim_frame -= 1
+
+			if anim.on_finish != nil {
+			    anim.on_finish(gs, &e)
+			}
+		    }
 		}
 
-		e.animation_timer = anim.time
+		// Event handeling
+		for &event in anim.timed_events {
+		    if event.timer > 0 {
+			event.timer -= dt
+
+			if event.timer <= 0 {
+			    event.callback(gs, &e)
+			}
+		    }
+		}
+		
 	    }
 	}
     }

@@ -2,6 +2,8 @@ package game
 
 behavior_update :: proc(entities: []Entity, static_colliders: []Rect, dt: f32) {
     for &e in entities {
+	if .Dead in e.flags do continue // dont run behavior code for dead entities
+
 	if .Walk in e.behaviors {
 	    if .Left in e.flags {
 		e.vel.x = -e.move_speed

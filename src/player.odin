@@ -4,6 +4,7 @@ import rl "vendor:raylib"
 
 Player_Movement_State :: enum {
     Uncontrollable,
+    Attacking,
     Idle,
     Run,
     Jump,
@@ -28,26 +29,34 @@ player_update :: proc(gs: ^Game_State, dt: f32) {
 	    switch_animation(player, "idle")
 	    gs.player_movement_state = .Idle
 	}
+    case .Attacking:
+	if .Grounded in player.flags {
+	    player.vel.x = 0
+	}
     case .Idle:
 	try_run(gs, player)
 	try_jump(gs, player)
+	try_attack(gs, player)
     case .Run:
 	if input_x == 0 {
 	    gs.player_movement_state = .Idle
 	    switch_animation(player, "idle")
 	}
 	try_jump(gs, player)
+	try_attack(gs, player)
     case .Jump:
 	if player.vel.y >= 0 {
 	    gs.player_movement_state = .Fall
 	    player.current_anim_name = "fall"
 	    switch_animation(player, "fall")
 	}
+	try_attack(gs, player)
     case .Fall:
 	if .Grounded in player.flags {
 	    gs.player_movement_state = .Idle
 	    switch_animation(player, "idle")
 	}
+	try_attack(gs, player)
     }    
 }
 
@@ -57,6 +66,27 @@ player_on_enter :: proc(self_id, other_id: Entity_ID) {
 
     if other.on_hit_damage > 0 {
 	player.health -= other.on_hit_damage
+    }
+}
+
+player_on_finish_attack :: proc(gs: ^Game_State, player: ^Entity) {
+    switch_animation(player, "idle")
+    gs.player_movement_state = .Fall
+}
+
+player_attack_callback :: proc(gs: ^Game_State, player: ^Entity) {
+    center := Vec2{player.x, player.y}
+    center += {.Left in player.flags ? -30 + player.collider.width : 30, 20}
+
+    for &e, idx in gs.entities {
+	id := Entity_ID(idx)
+	if id == gs.player_id do continue
+	if .Dead in e.flags do continue
+	if .Immortal in e.flags do continue
+
+	if rl.CheckCollisionCircleRec(center, 25, e.collider) {
+	    entity_damage(Entity_ID(idx), 1)
+	}
     }
 }
 
@@ -73,5 +103,12 @@ try_jump :: proc(gs: ^Game_State, player: ^Entity) {
 	player.flags -= {.Grounded}
 	switch_animation(player, "jump")
 	gs.player_movement_state = .Jump
+    }
+}
+
+try_attack :: proc(gs: ^Game_State, player: ^Entity) {
+    if rl.IsMouseButtonPressed(.LEFT) {
+	switch_animation(player, "attack")
+	gs.player_movement_state = .Attacking
     }
 }

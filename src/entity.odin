@@ -1,6 +1,7 @@
 package game
 
 import "core:time"
+import "core:fmt"
 import rl "vendor:raylib"
 
 Entity :: struct {
@@ -112,18 +113,18 @@ entity_update :: proc(gs: ^Game_State, dt: f32) {
 			}
 		    }
 		}
+	    }
 
-		// Event handeling
-		for &event in anim.timed_events {
-		    if event.timer > 0 {
-			event.timer -= dt
+	    // Event handeling
+	    for &event in anim.timed_events {
+		if event.timer > 0 {
+		    event.timer -= dt
 
-			if event.timer <= 0 {
-			    event.callback(gs, &e)
-			}
+		    if event.timer <= 0 {
+			event.callback(gs, &e)
+			
 		    }
 		}
-		
 	    }
 	}
     }

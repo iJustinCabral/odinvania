@@ -2,6 +2,9 @@ package game
 
 import "core:fmt"
 import "core:os"
+import "core:time"
+import "base:intrinsics"
+import "core:encoding/json"
 import rl "vendor:raylib"
 
 // Constants
@@ -54,6 +57,34 @@ Animation_Event :: struct {
     timer:    f32,
     duration: f32,
     callback: proc(gs: ^Game_State, entity: ^Entity)
+}
+
+LDtk_Data :: struct {
+    levels: []LDtk_Level,
+}
+
+LDtk_Level :: struct {
+    identifier: string,
+    layerInstances: []LDtk_Layer_Instance,
+}
+
+LDtk_Layer_Instance :: struct {
+    __identifier:    string,
+    __tyep:          string,
+    __cWid, __cHei:  int,
+    intGridCsv:      []int,
+    autoLayerTiles:  []LDtk_Auto_Layer_Tile,
+    entityInstances: []LDtk_Entity,
+}
+
+LDtk_Auto_Layer_Tile :: struct {
+    px: [2]f32,
+}
+
+LDtk_Entity :: struct {
+    __identifier: string,
+    __worldX:     f32,
+    __worldY:     f32,
 }
 
 gs: Game_State
@@ -128,98 +159,73 @@ main :: proc() {
 
     // Set up our level
     {
-	level_data, ok := os.read_entire_file("../data/simple_level.dat")
+	level_data, ok := os.read_entire_file("../data/world.ldtk", allocator = context.allocator)
 	assert(ok, "Failed to load level data")
 	x, y: f32
+	
+	ldtk_data:= new(LDtk_Data, context.temp_allocator)
+	err := json.unmarshal(level_data, ldtk_data, allocator = context.allocator)
 
-	for v in level_data {
-	    switch v {
-	    case '\n':
-		y += TILE_SIZE
-		x = 0
-		continue
-	    case '#':
-		append(&gs.solid_tiles, Rect{x,y, TILE_SIZE, TILE_SIZE})
-	    case 'P':
-		gs.player_id = entity_create(
-		    {
-			x = x, y = y, width = 16, height = 38, move_speed = 280, jump_force = 650,
-			on_enter = player_on_enter,
-			health = 5,
-			max_health = 5,
-			texture = &player_texture,
-			animations = {
-			    "idle" = player_anim_idle,
-			    "jump" = player_anim_jump,
-			    "jump_fall_inbetween" = player_anim_jump_fall_inbetween,
-			    "fall" = player_anim_fall,
-			    "run" = player_anim_run,
-			    "attack" = player_anim_attack,
-			},
-			current_anim_name = "idle",
-		    }
-		)
-	    case 'e':
-		entity_create(
-		    Entity{
-			collider = Rect{x,y, TILE_SIZE, TILE_SIZE},
-			move_speed = 50,
-			flags = {.Debug_Draw},
-			behaviors = {.Walk, .Flip_At_Wall, .Flip_At_Edge},
-			debug_color = rl.RED,
-			health = 1,
-			max_health = 2,
-			on_hit_damage = 1,
-		    }
-		)
-	    case '^':
-		id := entity_create(
-		    Entity {
-			collider = Rect{x, y + SPIKE_DIFF, SPIKE_BREADTH, SPIKE_DEPTH},
-			on_enter = spike_on_enter,
-			flags = {.Kinematic, .Immortal, .Debug_Draw},
-			debug_color = rl.YELLOW,
-			on_hit_damage = 1
-		    }
-		)
-		gs.spikes[id] = .Up
-	    case 'v':
-		id := entity_create(
-		    Entity{
-			collider = Rect{x, y, SPIKE_BREADTH, SPIKE_DEPTH},
-			on_enter = spike_on_enter,
-			flags = {.Kinematic, .Immortal, .Debug_Draw},
-			debug_color = rl.YELLOW,
-			on_hit_damage = 1,
-		    }
-		)
-		gs.spikes[id] = .Down
-	    case '>':
-		id := entity_create(
-		    Entity{
-			collider = Rect{x, y, SPIKE_DEPTH, SPIKE_BREADTH},
-			on_enter = spike_on_enter,
-			flags = {.Kinematic, .Immortal, .Debug_Draw},
-			debug_color = rl.YELLOW,
-			on_hit_damage = 1,
-		    }
-		)
-		gs.spikes[id] = .Right
-	    case '<':
-		id := entity_create(
-		    Entity{
-			collider = Rect{x + SPIKE_DIFF, y, SPIKE_DEPTH, SPIKE_BREADTH},
-			on_enter = spike_on_enter,
-			flags = {.Kinematic, .Immortal, .Debug_Draw},
-			debug_color = rl.YELLOW,
-			on_hit_damage = 1,
-		    }
-		)
-		gs.spikes[id] = .Left
-	    }
-	// move X to the next tile
-	x += TILE_SIZE
+	if err != nil {
+	    fmt.println(err)
+	    return
 	}
+
+	for level in ldtk_data.levels {
+	    if level.identifier != "Level_0" do continue
+
+	    for layer in level.layerInstances {
+		switch layer.__identifier {
+		case "Entities":
+		    for entity in layer.entityInstances {
+			switch entity.__identifier {
+			case "Player":
+			    px, py := entity.__worldX, entity.__worldY
+			    gs.player_id = entity_create(
+				{
+				    x = px,
+				    y = py,
+				    width = 16,
+				    height = 38,
+				    move_speed = 280,
+				    jump_force = 650,
+				    health = 5,
+				    max_health = 5,
+				    debug_color = rl.GREEN,
+				    texture = &player_texture,
+				    on_enter = player_on_enter,
+				    current_anim_name = "idle",
+				    animations = {
+					"idle" = player_anim_idle,
+					"jump" = player_anim_jump,
+					"jump_fall_inbetween" = player_anim_jump_fall_inbetween,
+					"fall" = player_anim_fall,
+					"run"  = player_anim_run,
+					"attack" = player_anim_attack,
+				    },
+
+				},
+			    )
+			case "Door":
+			}
+		    }
+		case "Collisions":
+		    x, y: f32
+		    for v, i in layer.intGridCsv {
+			if v != 0 {
+			    append(&gs.solid_tiles, Rect{x,y, TILE_SIZE, TILE_SIZE})
+			}
+
+			x += TILE_SIZE
+			if (i + 1) % layer.__cWid == 0 { // when we hit the edge of level, move down y and reset x
+			    y += TILE_SIZE
+			    x = 0
+			}
+		    }
+		}
+	    }
+	}
+	
     }
 
     for !rl.WindowShouldClose() {

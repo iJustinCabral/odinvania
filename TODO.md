@@ -71,9 +71,10 @@ Impelement saving and loading
 *Parsing LDtk  
 *Render wider/taller collision tiles as single shapes for performance  
 *Health and safe zones added  
+*Load and draw tiles from the sprite atlas  
+*Drawing tiles based on LDtk data  
 
 Implement command buffer  
-Load and draw tiles from a srpite atlas for better performance  
 Implement camera bounds like 2D mario games  
 Load entities from placement on LDtk maps  
 Enemy hit feedback and animations  

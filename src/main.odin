@@ -33,6 +33,8 @@ Game_State :: struct {
     player_movement_state: Player_Movement_State,
     entities:              [dynamic]Entity,
     colliders:             [dynamic]Rect,
+    bg_tiles:              [dynamic]Tile,
+    tiles:                 [dynamic]Tile,
     spikes:                map[Entity_ID]Direction,
     debug_shapes:          [dynamic]Debug_Shape
 }
@@ -79,13 +81,21 @@ LDtk_Layer_Instance :: struct {
 }
 
 LDtk_Auto_Layer_Tile :: struct {
-    px: [2]f32,
+    px:  [2]f32, // position on the world map
+    src: Vec2, // where the tile is in the tileset
+    f:   u8, // is it flipped
 }
 
 LDtk_Entity :: struct {
     __identifier: string,
     __worldX:     f32,
     __worldY:     f32,
+}
+
+Tile :: struct {
+    pos: Vec2,
+    src: Vec2,
+    f:   u8,
 }
 
 gs: Game_State
@@ -97,6 +107,7 @@ main :: proc() {
     gs.camera = rl.Camera2D { zoom = ZOOM }
 
     player_texture := rl.LoadTexture("../assets/textures/player_sheet.png")
+    tileset_texure := rl.LoadTexture("../assets/textures/tileset.png")
     
     player_anim_idle := Animation {
 	size = {120, 80},
@@ -266,6 +277,16 @@ main :: proc() {
 
 		    append(&gs.colliders, big_rect)
 
+		    // LDtk Tiles
+		    for auto_tile in layer.autoLayerTiles {
+			append(&gs.tiles, Tile{auto_tile.px, auto_tile.src, auto_tile.f})
+		    }
+		
+		case "Background":
+		    for auto_tile in layer.autoLayerTiles {
+			append(&gs.bg_tiles, Tile{auto_tile.px, auto_tile.src, auto_tile.f})
+		    }
+
 		}
 	    }
 	}
@@ -317,6 +338,46 @@ main :: proc() {
 	rl.BeginDrawing()
 	rl.BeginMode2D(gs.camera)
 	rl.ClearBackground(BG_COLOR)
+
+	// Draw the LDtk background tiles
+	for tile in gs.bg_tiles {
+	    width: f32 = TILE_SIZE
+	    height: f32 = TILE_SIZE
+
+	    if tile.f == 1 || tile.f == 3 {
+		width = -TILE_SIZE
+	    }
+	    else if tile.f == 2 || tile.f == 3 {
+		height = -TILE_SIZE
+	    }
+
+	    rl.DrawTextureRec(
+		tileset_texure,
+		{tile.src.x, tile.src.y, width, height},
+		tile.pos,
+		rl.WHITE,
+	    )
+	}
+
+	// Draw the LDtk foreground tiles
+	for tile in gs.tiles {
+	    width: f32 = TILE_SIZE
+	    height: f32 = TILE_SIZE
+
+	    if tile.f == 1 || tile.f == 3 {
+		width = -TILE_SIZE
+	    }
+	    else if tile.f == 2 || tile.f == 3 {
+		height = -TILE_SIZE
+	    }
+
+	    rl.DrawTextureRec(
+		tileset_texure,
+		{tile.src.x, tile.src.y, width, height},
+		tile.pos,
+		rl.WHITE,
+	    )
+	}
 
 	// Debug Drawing
 	for &e in gs.entities {

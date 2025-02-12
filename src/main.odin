@@ -33,8 +33,6 @@ Game_State :: struct {
     player_movement_state: Player_Movement_State,
     entities:              [dynamic]Entity,
     colliders:             [dynamic]Rect,
-    wide_rects:            [dynamic]Rect,
-    solid_tiles:           [dynamic]rl.Rectangle,
     spikes:                map[Entity_ID]Direction,
     debug_shapes:          [dynamic]Debug_Shape
 }
@@ -213,10 +211,12 @@ main :: proc() {
 			}
 		    }
 		case "Collisions":
+		    solid_tiles := make([dynamic]Rect, context.temp_allocator)
+
 		    x, y: f32
 		    for v, i in layer.intGridCsv {
 			if v != 0 {
-			    append(&gs.solid_tiles, Rect{x,y, TILE_SIZE, TILE_SIZE})
+			    append(&solid_tiles, Rect{x,y, TILE_SIZE, TILE_SIZE})
 			}
 
 			x += TILE_SIZE
@@ -227,32 +227,33 @@ main :: proc() {
 		    }
 
 		    // Joining adjacent tiles on the x axis into one wide tile
-		    wide_rect := gs.solid_tiles[0]
+		    wide_rect := solid_tiles[0]
+		    wide_rects := make([dynamic]Rect, context.temp_allocator)
 
-		    for i in 1..<len(gs.solid_tiles) {
-			rect := gs.solid_tiles[i]
+		    for i in 1..<len(solid_tiles) {
+			rect := solid_tiles[i]
 
 			if rect.x == wide_rect.x + wide_rect.width {
 			    wide_rect.width += TILE_SIZE
 			}
 			else {
-			    append(&gs.wide_rects, wide_rect)
+			    append(&wide_rects, wide_rect)
 			    wide_rect = rect
 			}
 		    }
 
-		    append(&gs.wide_rects, wide_rect)
+		    append(&wide_rects, wide_rect)
 
-		    slice.sort_by(gs.wide_rects[:], proc(a,b: Rect) -> bool {
+		    slice.sort_by(wide_rects[:], proc(a,b: Rect) -> bool {
 			if a.x != b.x do return a.x < b.x
 			return a.y < b.y
 		    })
 
 		    // Joining adjacent tiles on the y axis into one big rect
-		    big_rect := gs.wide_rects[0]
+		    big_rect := wide_rects[0]
 
-		    for i in 1..<len(gs.wide_rects) {
-			rect := gs.wide_rects[i]
+		    for i in 1..<len(wide_rects) {
+			rect := wide_rects[i]
 
 			if rect.x == big_rect.x && rect.width == big_rect.width && big_rect.y + big_rect.height == rect.y {
 			    big_rect.height += TILE_SIZE 
@@ -280,8 +281,8 @@ main :: proc() {
 	// [:] take the slice of our dynamic arrays
 	player_update(&gs, dt)
 	entity_update(&gs, dt)
-	physics_update(gs.entities[:], gs.solid_tiles[:], dt)
-	behavior_update(gs.entities[:], gs.solid_tiles[:], dt)
+	physics_update(gs.entities[:], gs.colliders[:], dt)
+	behavior_update(gs.entities[:], gs.colliders[:], dt)
 
 	if .Grounded in player.flags {
 	    pos := Vec2{player.x, player.y}
@@ -296,10 +297,10 @@ main :: proc() {
 	    }
 
 	    safety_check: {
-		_, hit_ground_left := raycast(pos + {0, size.y}, DOWN * 2, gs.solid_tiles[:])
+		_, hit_ground_left := raycast(pos + {0, size.y}, DOWN * 2, gs.colliders[:])
 		if !hit_ground_left do break safety_check
 
-		_, hit_ground_right := raycast(pos + size, DOWN * 2, gs.solid_tiles[:])
+		_, hit_ground_right := raycast(pos + size, DOWN * 2, gs.colliders[:])
 		if !hit_ground_right do break safety_check
 
 		_, hit_entity_left := raycast(pos, LEFT * TILE_SIZE, targets[:])
@@ -349,8 +350,8 @@ main :: proc() {
 	    rl.DrawRectangleLinesEx(rect, 1, rl.ORANGE)
 	}
 
-	for rect in gs.solid_tiles {
-	    rl.DrawRectangleLinesEx(rect,1, {255, 255, 255, 40})
+	for rect in gs.colliders {
+	    rl.DrawRectangleRec(rect, {255, 255, 255, 40})
 	}
 
 	// Attack circle

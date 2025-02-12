@@ -63,4 +63,26 @@ Create a main menu scene
 Impelement saving and loading  
 
 
+### -= 02/11/2025 =-
+
+*Fixed attack animation callback  
+*Implemented Finite State Machines for animatmions  
+*Integrated LDk for 2D tile maps  
+*Parsing LDtk  
+*Render wider/taller collision tiles as single shapes for performance  
+*Health and safe zones added  
+
+Implement command buffer  
+Load and draw tiles from a srpite atlas for better performance  
+Implement camera bounds like 2D mario games  
+Load entities from placement on LDtk maps  
+Enemy hit feedback and animations  
+Add hards and obstacles  
+Sound effects and music integration  
+Player Health UI  
+Add checkpoints in levels  
+Add new player abilities  
+Create a main menu scene  
+Impelement saving and loading  
+
 

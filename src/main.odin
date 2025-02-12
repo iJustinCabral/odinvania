@@ -3,6 +3,7 @@ package game
 import "core:fmt"
 import "core:os"
 import "core:time"
+import "core:slice"
 import "base:intrinsics"
 import "core:encoding/json"
 import rl "vendor:raylib"
@@ -31,6 +32,8 @@ Game_State :: struct {
     safe_reset_timer:      f32,
     player_movement_state: Player_Movement_State,
     entities:              [dynamic]Entity,
+    colliders:             [dynamic]Rect,
+    wide_rects:            [dynamic]Rect,
     solid_tiles:           [dynamic]rl.Rectangle,
     spikes:                map[Entity_ID]Direction,
     debug_shapes:          [dynamic]Debug_Shape
@@ -222,6 +225,46 @@ main :: proc() {
 			    x = 0
 			}
 		    }
+
+		    // Joining adjacent tiles on the x axis into one wide tile
+		    wide_rect := gs.solid_tiles[0]
+
+		    for i in 1..<len(gs.solid_tiles) {
+			rect := gs.solid_tiles[i]
+
+			if rect.x == wide_rect.x + wide_rect.width {
+			    wide_rect.width += TILE_SIZE
+			}
+			else {
+			    append(&gs.wide_rects, wide_rect)
+			    wide_rect = rect
+			}
+		    }
+
+		    append(&gs.wide_rects, wide_rect)
+
+		    slice.sort_by(gs.wide_rects[:], proc(a,b: Rect) -> bool {
+			if a.x != b.x do return a.x < b.x
+			return a.y < b.y
+		    })
+
+		    // Joining adjacent tiles on the y axis into one big rect
+		    big_rect := gs.wide_rects[0]
+
+		    for i in 1..<len(gs.wide_rects) {
+			rect := gs.wide_rects[i]
+
+			if rect.x == big_rect.x && rect.width == big_rect.width && big_rect.y + big_rect.height == rect.y {
+			    big_rect.height += TILE_SIZE 
+			} 
+			else {
+			    append(&gs.colliders, big_rect)
+			    big_rect = rect 
+			}
+		    }
+
+		    append(&gs.colliders, big_rect)
+
 		}
 	    }
 	}
@@ -301,10 +344,13 @@ main :: proc() {
 	    }
 	}
 	
-	// Create the map
+	// Draw collision tiles
+	for rect in gs.colliders {
+	    rl.DrawRectangleLinesEx(rect, 1, rl.ORANGE)
+	}
+
 	for rect in gs.solid_tiles {
-	    rl.DrawRectangleRec(rect, rl.WHITE)
-	    rl.DrawRectangleLinesEx(rect, 1, rl.GRAY)
+	    rl.DrawRectangleLinesEx(rect,1, {255, 255, 255, 40})
 	}
 
 	// Attack circle

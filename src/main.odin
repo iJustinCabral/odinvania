@@ -1,6 +1,7 @@
 package game
 
 import "core:fmt"
+import "core:log"
 import "core:os"
 import "core:time"
 import "core:slice"
@@ -99,9 +100,33 @@ LDtk_Auto_Layer_Tile :: struct {
 }
 
 LDtk_Entity :: struct {
+    __identifier:   string,
+    __worldX:       f32,
+    __worldY:       f32,
+    __tags:         []string,
+    width:          f32,
+    height:         f32,
+    fieldInstances: []LDtk_Field_Instance,
+}
+
+LDtk_Field_Instance :: struct {
     __identifier: string,
-    __worldX:     f32,
-    __worldY:     f32,
+    __type:       string,
+    __value:      LDtk_Field_Instance_Value,
+}
+
+LDtk_Field_Instance_Value :: union {
+    LDtk_Entity_Ref,
+    bool,
+    f32,
+    int,
+}
+
+LDtk_Entity_Ref :: struct {
+    entityIid: string,
+    layerIid:  string,
+    levelIid:  string,
+    worldIid:  string,
 }
 
 Tile :: struct {
@@ -193,8 +218,7 @@ main :: proc() {
 	err := json.unmarshal(level_data, ldtk_data, allocator = context.allocator)
 
 	if err != nil {
-	    fmt.println(err)
-	    return
+	    log.panicf("failed to parse level json data: %v", err)    
 	}
 
 	for level in ldtk_data.levels {
@@ -236,6 +260,34 @@ main :: proc() {
 				},
 			    )
 			case "Door":
+			}
+
+			if slice.contains(entity.__tags, "Enemy") {
+			    enemy := Entity {
+				x = entity.__worldX,
+				y = entity.__worldY,
+				width = entity.width,
+				height = entity.height,
+				flags = {.Debug_Draw},
+				debug_color = rl.RED,
+			    }
+
+			    for field_instance in entity.fieldInstances {
+				switch field_instance.__identifier {
+				case "Move_Speed":
+				    enemy.move_speed = field_instance.__value.(f32)
+				case "Health":
+				    enemy.health = int(field_instance.__value.(f32))
+				case "EB_Walk":
+				    if field_instance.__value.(bool) do enemy.behaviors += {.Walk}
+				case "EB_Flip_At_Wall":
+				    if field_instance.__value.(bool) do enemy.behaviors += {.Flip_At_Wall}
+				case "EB_Flip_At_Edge":
+				    if field_instance.__value.(bool) do enemy.behaviors += {.Flip_At_Edge}
+				}
+			    }
+
+			    entity_create(enemy)
 			}
 		    }
 		case "Collisions":

@@ -14,7 +14,7 @@ behavior_update :: proc(entities: []Entity, static_colliders: []Rect, dt: f32) {
 
 	if .Flip_At_Wall in e.behaviors {
 	    if .Left in e.flags {
-		if hits, ok := raycast(
+		if _, ok := raycast(
 		    {e.x + e.width / 2, e.y + e.height / 2},
 		    {-e.width / 2 - COLLISION_EPSILON, 0},
 		    static_colliders,
@@ -25,7 +25,7 @@ behavior_update :: proc(entities: []Entity, static_colliders: []Rect, dt: f32) {
 		}
 	    }
 	    else {
-		if hits, ok := raycast(
+		if _, ok := raycast(
 		    {e.x + e.width / 2, e.y + e.height / 2},
 		    {e.width / 2 + COLLISION_EPSILON, 0},
 		    static_colliders

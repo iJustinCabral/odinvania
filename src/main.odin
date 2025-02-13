@@ -11,9 +11,13 @@ import rl "vendor:raylib"
 // Constants
 WINDOW_WIDTH   :: 1280
 WINDOW_HEIGHT  :: 720
-ZOOM           :: 2
+RENDER_WIDTH   :: 640
+RENDER_HEIGHT  :: 360
+ZOOM           :: WINDOW_WIDTH / RENDER_WIDTH
 BG_COLOR       :: rl.BLACK
 TILE_SIZE      :: 16
+JUMP_TIME      :: 0.2
+COYOTE_TIME    :: 0.15
 UP             :: Vec2{0, -1}
 RIGHT          :: Vec2{1, 0}
 DOWN           :: Vec2{0, 1}
@@ -30,6 +34,10 @@ Game_State :: struct {
     player_id:             Entity_ID,
     safe_position:         Vec2,
     safe_reset_timer:      f32,
+    level_min:             Vec2, // tope left of level
+    level_max:             Vec2, // bottom right of level
+    jump_timer:            f32,
+    coyote_timer:          f32,
     player_movement_state: Player_Movement_State,
     entities:              [dynamic]Entity,
     colliders:             [dynamic]Rect,
@@ -68,6 +76,10 @@ LDtk_Data :: struct {
 
 LDtk_Level :: struct {
     identifier: string,
+    worldX: f32,
+    worldY: f32,
+    pxWid: f32,
+    pxHei: f32,
     layerInstances: []LDtk_Layer_Instance,
 }
 
@@ -103,8 +115,10 @@ gs: Game_State
 main :: proc() {
     rl.InitWindow(WINDOW_WIDTH, WINDOW_HEIGHT, "Odinvania")
     rl.SetTargetFPS(60)
-
-    gs.camera = rl.Camera2D { zoom = ZOOM }
+    
+    gs.camera = rl.Camera2D {
+	zoom = ZOOM,
+    } 
 
     player_texture := rl.LoadTexture("../assets/textures/player_sheet.png")
     tileset_texure := rl.LoadTexture("../assets/textures/tileset.png")
@@ -185,6 +199,9 @@ main :: proc() {
 
 	for level in ldtk_data.levels {
 	    if level.identifier != "Level_0" do continue
+
+	    gs.level_min = {level.worldX, level.worldY}
+	    gs.level_max = gs.level_min + {level.pxWid, level.pxHei}
 
 	    for layer in level.layerInstances {
 		switch layer.__identifier {
@@ -299,11 +316,36 @@ main :: proc() {
 	dt := rl.GetFrameTime()
 	player := entity_get(gs.player_id)
 
+        
+
 	// [:] take the slice of our dynamic arrays
 	player_update(&gs, dt)
 	entity_update(&gs, dt)
 	physics_update(gs.entities[:], gs.colliders[:], dt)
 	behavior_update(gs.entities[:], gs.colliders[:], dt)
+
+	// Camera Update 
+	{
+	    // Camera target starts in the top left, so we want it to be on our player in the center of the screen
+	    render_half_size := Vec2{RENDER_WIDTH, RENDER_HEIGHT} / 2
+	    gs.camera.target = {player.x, player.y} - render_half_size
+
+	    if gs.camera.target.x < gs.level_min.x {
+		gs.camera.target.x = gs.level_min.x 
+	    }
+
+	    if gs.camera.target.y < gs.level_min.y {
+		gs.camera.target.y = gs.level_min.y 
+	    }
+
+	    if gs.camera.target.x + RENDER_WIDTH > gs.level_max.x {
+		gs.camera.target.x = gs.level_max.x - RENDER_WIDTH
+	    }
+
+	    if gs.camera.target.y + RENDER_HEIGHT > gs.level_max.y {
+		gs.camera.target.y = gs.level_max.y - RENDER_HEIGHT
+	    }
+	}
 
 	if .Grounded in player.flags {
 	    pos := Vec2{player.x, player.y}
@@ -440,9 +482,9 @@ main :: proc() {
 	    }
 	}
 
-	rl.DrawFPS(20, 20)
 
 	rl.EndMode2D()
+	rl.DrawFPS(20, 20)
 	defer rl.EndDrawing()
 	clear(&gs.debug_shapes)
     }

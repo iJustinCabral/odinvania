@@ -92,8 +92,8 @@ Impelement saving and loading
 *Implement command buffer  
 *Implement camera bounds like 2D mario games  
 *Added coyote time jump
+*Load entities from placement on LDtk maps  
 
-Load entities from placement on LDtk maps  
 Enemy hit feedback and animations  
 Add hards and obstacles  
 Sound effects and music integration  
@@ -104,5 +104,23 @@ Create a main menu scene
 Impelement saving and loading  
 
 
+### -= 02/14/2025 =-
+
+Enemy hit feedback and animations  
+Add hards and obstacles  
+Sound effects and music integration  
+Player Health UI  
+Add checkpoints in levels  
+Add new player abilities  
+Create a main menu scene  
+Impelement saving and loading  
+New enemy behaviors  
+Inventory system  
+Show world map  
+Include a boss fight  
+In-engine level editor instead of LDtk  
+Particle system  
+Attack comobos  
+Screen shake when hit/attacking  
 
 

@@ -64,9 +64,6 @@ physics_update :: proc(entities: []Entity, static_colliders: []Rect, dt: f32) {
 		    }
 		}
 
-		if entity.vel.x < 0 do entity.flags += {.Left}
-		if entity.vel.x > 0 do entity.flags -= {.Left}
-
 		// X Axis
 		entity.x += entity.vel.x * step
 		for static in static_colliders {

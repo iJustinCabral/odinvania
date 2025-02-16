@@ -51,6 +51,7 @@ Game_State :: struct {
     spikes:                map[Entity_ID]Direction,
     enemty_defintions:     map[string]Enemy_Def,
     debug_shapes:          [dynamic]Debug_Shape,
+    debug_draw_enabled:    bool,
 }
 
 Animation :: struct {
@@ -243,9 +244,9 @@ main :: proc() {
 	start = 0,
 	end = 3,
 	row = 3,
-	time = 0.15,
+	time = 0.05,
 	on_finish = player_on_finish_attack,
-	timed_events = {{timer = 0.15, duration = 0.15, callback = player_attack_callback}},
+	timed_events = {{timer = 0.05, duration = 0.05, callback = player_attack_callback}},
     }
 
 
@@ -304,28 +305,26 @@ main :: proc() {
 			}
 
 			if slice.contains(entity.__tags, "Enemy") {
-			    enemy := Entity {
-				x = entity.__worldX,
-				y = entity.__worldY,
-				width = entity.width,
-				height = entity.height,
-				flags = {.Debug_Draw},
-				debug_color = rl.RED,
-			    }
+			    def := &gs.enemty_defintions[entity.__identifier]
 
-			    for field_instance in entity.fieldInstances {
-				switch field_instance.__identifier {
-				case "Move_Speed":
-				    enemy.move_speed = field_instance.__value.(f32)
-				case "Health":
-				    enemy.health = int(field_instance.__value.(f32))
-				case "EB_Walk":
-				    if field_instance.__value.(bool) do enemy.behaviors += {.Walk}
-				case "EB_Flip_At_Wall":
-				    if field_instance.__value.(bool) do enemy.behaviors += {.Flip_At_Wall}
-				case "EB_Flip_At_Edge":
-				    if field_instance.__value.(bool) do enemy.behaviors += {.Flip_At_Edge}
-				}
+			    enemy := Entity {
+				collider = {
+				    entity.__worldX,
+				    entity.__worldY,
+				    def.collider_size.x,
+				    def.collider_size.y,
+				},
+				move_speed = def.move_speed,
+				behaviors  = def.behaviors,
+				health     = def.health,
+				on_hit_damage = def.on_hit_damage,
+				texture = &def.texture,
+				animations = def.animations,
+				current_anim_name = def.initial_animation,
+				debug_color = rl.RED,
+				flags = {.Debug_Draw},
+				hit_response = def.hit_response,
+				hit_duration = def.hit_duration,
 			    }
 
 			    entity_create(enemy)
@@ -516,6 +515,8 @@ main :: proc() {
 
 	// Debug Drawing
 	for &e in gs.entities {
+	    if .Dead in e.flags do continue 
+
 	    if e.texture != nil {
 		e.animation_timer -= dt
 
@@ -535,9 +536,11 @@ main :: proc() {
 
 		rl.DrawTextureRec(e.texture^, source, {e.x, e.y} - anim.offset, rl.WHITE)
 	    }
-
-	    if .Debug_Draw in e.flags && .Dead not_in e.flags {
-		rl.DrawRectangleLinesEx(e.collider, 1, e.debug_color)
+	    
+	    if gs.debug_draw_enabled {
+		if .Debug_Draw in e.flags && .Dead not_in e.flags {
+		    rl.DrawRectangleLinesEx(e.collider, 1, e.debug_color)
+		}
 	    }
 	}
 	

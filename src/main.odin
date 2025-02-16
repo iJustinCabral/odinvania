@@ -24,6 +24,8 @@ RIGHT          :: Vec2{1, 0}
 DOWN           :: Vec2{0, 1}
 LEFT           :: Vec2{-1, 0}
 PLAYER_SAFE_RESET_TIME :: 1
+ATTACK_COOLDOWN :: 0.3
+ATTACK_RECOVERY :: 0.2
 
 // Type Aliases	    
 Vec2 :: rl.Vector2
@@ -39,13 +41,16 @@ Game_State :: struct {
     level_max:             Vec2, // bottom right of level
     jump_timer:            f32,
     coyote_timer:          f32,
+    attack_cooldown_timer: f32,
+    attack_recovery_timer: f32,
     player_movement_state: Player_Movement_State,
     entities:              [dynamic]Entity,
     colliders:             [dynamic]Rect,
     bg_tiles:              [dynamic]Tile,
     tiles:                 [dynamic]Tile,
     spikes:                map[Entity_ID]Direction,
-    debug_shapes:          [dynamic]Debug_Shape
+    enemty_defintions:     map[string]Enemy_Def,
+    debug_shapes:          [dynamic]Debug_Shape,
 }
 
 Animation :: struct {
@@ -135,6 +140,20 @@ Tile :: struct {
     f:   u8,
 }
 
+Enemy_Def :: struct {
+    collider_size:       Vec2,
+    move_speed:          f32,
+    behaviors:           bit_set[Entity_Behaviors],
+    health:              int,
+    on_hit_damage:       int,
+    texture:             rl.Texture2D,
+    animations:          map[string]Animation,
+    initial_animation:   string,
+    hit_response:        Entity_Hit_Response,
+    hit_duration:        f32,
+    hit_knockback_force: f32,
+}
+
 gs: Game_State
 
 main :: proc() {
@@ -147,6 +166,28 @@ main :: proc() {
 
     player_texture := rl.LoadTexture("../assets/textures/player_sheet.png")
     tileset_texure := rl.LoadTexture("../assets/textures/tileset.png")
+
+    gs.enemty_defintions["Walker"] = Enemy_Def {
+	collider_size = {36, 18},
+	move_speed = 35,
+	health = 3,
+	behaviors = {.Walk, .Flip_At_Wall, .Flip_At_Edge},
+	on_hit_damage = 1,
+	texture = rl.LoadTexture("../assets/textures/opossum_36x28.png"),
+	animations = {
+	    "walk" = Animation {
+		size = {36, 28},
+		offset = {0, 10},
+		start = 0,
+		end = 5,
+		time = 0.15,
+		flags = {.Loop},
+	    },
+	},
+	initial_animation = "walk",
+	hit_response = .Stop,
+	hit_duration = 0.25,
+    }
     
     player_anim_idle := Animation {
 	size = {120, 80},

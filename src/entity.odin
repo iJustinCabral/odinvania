@@ -17,6 +17,9 @@ Entity :: struct {
     current_anim_name:  string,
     current_anim_frame: int,
     animation_timer:    f32,
+    hit_timer:          f32,
+    hit_duration:       f32,
+    hit_response:       Entity_Hit_Response,
     animations:     map[string]Animation,
     entity_ids:     map[Entity_ID]time.Time,
     flags:          bit_set[Entity_Flags],
@@ -33,6 +36,7 @@ Entity_Flags :: enum {
     Left,
     Dead,
     Immortal,
+    Frozen,
     Kinematic,
     Debug_Draw,
 }
@@ -41,6 +45,11 @@ Entity_Behaviors :: enum {
     Walk,
     Flip_At_Wall,
     Flip_At_Edge,
+}
+
+Entity_Hit_Response :: enum {
+    Stop,
+    Knockback,
 }
 
 switch_animation :: proc(entity: ^Entity, name: string) {

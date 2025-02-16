@@ -2,10 +2,12 @@ package game
 
 import rl "vendor:raylib"
 import "core:fmt"
+import "core:math/linalg"
 
 Player_Movement_State :: enum {
     Uncontrollable,
     Attacking,
+    Attack_Cooldown,
     Idle,
     Run,
     Jump,
@@ -24,6 +26,14 @@ player_update :: proc(gs: ^Game_State, dt: f32) {
 
     player.vel.x = input_x * player.move_speed
 
+    if player.vel.x > 0 do player.flags -= {.Left}
+    if player.vel.x < 0 do player.flags += {.Left}
+
+    if gs.attack_recovery_timer > 0 {
+	gs.attack_recovery_timer -= dt
+	player.vel *= 0.5
+    }
+
     gs.jump_timer -= dt
     gs.coyote_timer -= dt
 
@@ -40,6 +50,12 @@ player_update :: proc(gs: ^Game_State, dt: f32) {
 	if .Grounded in player.flags {
 	    player.vel.x = 0
 	}
+    case .Attack_Cooldown:
+	gs.attack_cooldown_timer -= dt
+	if gs.attack_cooldown_timer <= 0 {
+	    gs.player_movement_state = .Idle
+	}
+	try_run(gs, player)
     case .Idle:
 	try_run(gs, player)
 	try_jump(gs, player)
@@ -82,7 +98,7 @@ player_on_enter :: proc(self_id, other_id: Entity_ID) {
 
 player_on_finish_attack :: proc(gs: ^Game_State, player: ^Entity) {
     switch_animation(player, "idle")
-    gs.player_movement_state = .Fall
+    gs.player_movement_state = .Attack_Cooldown
 }
 
 player_attack_callback :: proc(gs: ^Game_State, player: ^Entity) {
@@ -98,6 +114,16 @@ player_attack_callback :: proc(gs: ^Game_State, player: ^Entity) {
 	if rl.CheckCollisionCircleRec(center, 25, e.collider) {
 	    entity_damage(Entity_ID(idx), 1)
 	}
+
+	a := rect_center(player.collider)
+	b := rect_center(e.collider)
+	dir := linalg.normalize0(b - a)
+
+	player.vel.x = -dir.x * 500
+	player.vel.y = -dir.y * 200 - 100
+
+	gs.attack_recovery_timer = ATTACK_RECOVERY
+	entity_hit(Entity_ID(idx), dir * 500)
     }
 }
 
@@ -131,5 +157,6 @@ try_attack :: proc(gs: ^Game_State, player: ^Entity) {
     if rl.IsMouseButtonPressed(.LEFT) {
 	switch_animation(player, "attack")
 	gs.player_movement_state = .Attacking
+	gs.attack_cooldown_timer = ATTACK_COOLDOWN
     }
 }

@@ -1,3 +1,4 @@
+#+feature dynamic-literals
 package game
 
 import "core:fmt"
@@ -15,7 +16,7 @@ WINDOW_HEIGHT  :: 720
 RENDER_WIDTH   :: 640
 RENDER_HEIGHT  :: 360
 ZOOM           :: WINDOW_WIDTH / RENDER_WIDTH
-BG_COLOR       :: rl.BLACK
+BG_COLOR       :: rl.Color{50, 44, 67, 255}
 TILE_SIZE      :: 16
 JUMP_TIME      :: 0.2
 COYOTE_TIME    :: 0.15
@@ -48,7 +49,8 @@ Game_State :: struct {
     colliders:             [dynamic]Rect,
     bg_tiles:              [dynamic]Tile,
     tiles:                 [dynamic]Tile,
-    spikes:                map[Entity_ID]Direction,
+    spikes:                [dynamic]Spike,
+    falling_logs:          [dynamic]Falling_Log,
     enemty_defintions:     map[string]Enemy_Def,
     debug_shapes:          [dynamic]Debug_Shape,
     debug_draw_enabled:    bool,
@@ -126,6 +128,7 @@ LDtk_Field_Instance_Value :: union {
     bool,
     f32,
     int,
+    string,
 }
 
 LDtk_Entity_Ref :: struct {
@@ -275,11 +278,10 @@ main :: proc() {
 		    for entity in layer.entityInstances {
 			switch entity.__identifier {
 			case "Player":
-			    px, py := entity.__worldX, entity.__worldY
 			    gs.player_id = entity_create(
 				{
-				    x = px,
-				    y = py,
+				    x = entity.__worldX,
+				    y = entity.__worldY,
 				    width = 16,
 				    height = 38,
 				    move_speed = 280,
@@ -301,6 +303,33 @@ main :: proc() {
 
 				},
 			    )
+			case "Spikes":
+			    facing := Direction.Right
+			    x, y := entity.__worldX, entity.__worldY
+			    width, height := entity.width, entity.height
+
+			    switch entity.fieldInstances[0].__value {
+			    case "Up":
+				facing = .Up
+				y += SPIKE_DIFF
+				height = SPIKE_DEPTH
+			    case "Right":
+				facing = .Right
+				width = SPIKE_DEPTH
+			    case "Down":
+				facing = .Down
+				height = SPIKE_DEPTH
+			    case "Left":
+				facing = .Left
+				width = SPIKE_DEPTH
+				x += SPIKE_DIFF
+			    }
+
+			    append(&gs.spikes, Spike{collider = {x, y, width, height}, facing = facing})
+			
+			case "Falling_Log":
+			    append(&gs.falling_logs, Falling_Log{collider = {entity.__worldX, entity.__worldY, entity.width, entity.height}})
+
 			case "Door":
 			}
 
@@ -393,9 +422,26 @@ main :: proc() {
 		
 		case "Background":
 		    for auto_tile in layer.autoLayerTiles {
-			append(&gs.bg_tiles, Tile{auto_tile.px, auto_tile.src, auto_tile.f})
+			for spike in gs.spikes {
+			    if !rl.CheckCollisionRecs(spike.collider, {auto_tile.px.x, auto_tile.px.y, 16, 16}) {
+				append(&gs.bg_tiles, Tile{auto_tile.px, auto_tile.src, auto_tile.f})
+			    }
+			}
 		    }
 
+		}
+
+		for &falling_log in gs.falling_logs {
+		    center := rect_center(falling_log.collider)
+		    hits, hits_ok := raycast(center, UP * (gs.level_max.y - gs.level_min.y), gs.colliders[:])
+
+		    if hits_ok {
+			slice.sort_by(hits, proc(a, b: Vec2) -> bool {
+			    return a.y > b.y || a.y == b.y
+			})
+
+			falling_log.rope_height = center.y - hits[0].y - falling_log.collider.height / 2
+		    }
 		}
 	    }
 	}
@@ -413,8 +459,30 @@ main :: proc() {
 	// [:] take the slice of our dynamic arrays
 	player_update(&gs, dt)
 	entity_update(&gs, dt)
-	physics_update(gs.entities[:], gs.colliders[:], dt)
+	physics_update(gs.entities[:], gs.colliders[:], gs.falling_logs[:], dt)
 	behavior_update(gs.entities[:], gs.colliders[:], dt)
+
+	for &falling_log in gs.falling_logs {
+	    if falling_log.state == .Falling {
+		falling_log.collider.y += dt * 600
+
+		for collider in gs.colliders {
+		    if rl.CheckCollisionRecs(collider, falling_log.collider) {
+			if collider.y <= falling_log.collider.y + falling_log.collider.height {
+			    falling_log.state = .Settled
+			    append(&gs.colliders, falling_log.collider)
+			    break
+			}
+		    }
+		}
+
+		for entity, i in gs.entities {
+		    if rl.CheckCollisionRecs(entity.collider, falling_log.collider) {
+			entity_damage(Entity_ID(i), 999)
+		    }
+		}
+	    }
+	}
 
 	// Camera Update 
 	{
@@ -463,6 +531,10 @@ main :: proc() {
 
 		_, hit_entity_right := raycast(pos + {size.x, 0}, RIGHT * TILE_SIZE, targets[:])
 		if hit_entity_right do break safety_check
+
+		for spike in gs.spikes {
+		    if rl.CheckCollisionRecs(spike.collider, player.collider) { break safety_check }
+		}
 
 		gs.safe_position = pos
 	    }
@@ -543,6 +615,24 @@ main :: proc() {
 		}
 	    }
 	}
+
+	// Spike tiles
+	for spike in gs.spikes {
+	    rl.DrawRectangleLinesEx(spike.collider, 1, rl.YELLOW)
+	}
+
+	// Falling Log
+	for falling_log in gs.falling_logs {
+	    center := rect_center(falling_log.collider)
+	    if falling_log.state == .Default {
+		rope_pos := Vec2{center.x, center.y - falling_log.collider.height / 2}
+		rl.DrawLineEx(rope_pos, rope_pos - {0, falling_log.rope_height}, 1, rl.BROWN)
+	    }
+
+	    rl.DrawRectangleLinesEx(falling_log.collider, 1, rl.BROWN)
+	}
+
+	rl.DrawRectangleLinesEx({gs.safe_position.x, gs.safe_position.y, 16, 16}, 1, rl.BLUE)
 	
 	// Draw collision tiles
 	for rect in gs.colliders {

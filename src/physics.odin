@@ -13,7 +13,7 @@ COLLISION_EPSILON  :: 0.01
 // First two parameters take a slice []T
 // Slies are Pointer + Length
 // Last paramater is the Delta Time
-physics_update :: proc(entities: []Entity, static_colliders: []Rect, dt: f32) {
+physics_update :: proc(entities: []Entity, static_colliders: []Rect, logs: []Falling_Log,  dt: f32) {
     for &entity, e_id in entities {
 	// Skip the dead entities
 	entity_id := Entity_ID(e_id)
@@ -50,16 +50,14 @@ physics_update :: proc(entities: []Entity, static_colliders: []Rect, dt: f32) {
 		    // +--+---+ |
 		    //    +-----+
 		    if rl.CheckCollisionRecs(entity.collider, static) {
-			if entity.vel.y > 0 {
-			    // Moving rectnagle is above the static collider
-			    // High enough veloicty may not always be true
-			    // This is why we use multiple iterations
-			    entity.y = static.y - entity.height
-			    entity.flags += {.Grounded}
-			} else {
-			    entity.y = static.y + static.height
-			}
-			entity.vel.y = 0
+			resolve_entity_vs_static_y(&entity, static)
+			break
+		    }
+		}
+
+		for log in logs {
+		    if rl.CheckCollisionRecs(entity.collider, log.collider) {
+			resolve_entity_vs_static_y(&entity, log.collider)
 			break
 		    }
 		}
@@ -68,13 +66,14 @@ physics_update :: proc(entities: []Entity, static_colliders: []Rect, dt: f32) {
 		entity.x += entity.vel.x * step
 		for static in static_colliders {
 		    if rl.CheckCollisionRecs(entity.collider, static) {
-			if entity.vel.x > 0 {
-			    // Moving rectangle is left of static
-			    entity.x = static.x - entity.width
-			} else {
-			    entity.x = static.x + static.width
-			}
-			entity.vel.x = 0
+			resolve_entity_vs_static_x(&entity, static)
+			break
+		    }
+		}
+
+		for log in logs {
+		    if rl.CheckCollisionRecs(entity.collider, log.collider) {
+			resolve_entity_vs_static_x(&entity, log.collider)
 			break
 		    }
 		}
@@ -109,6 +108,26 @@ physics_update :: proc(entities: []Entity, static_colliders: []Rect, dt: f32) {
 	}
 
     }
+}
+
+resolve_entity_vs_static_y :: proc(entity: ^Entity, static: Rect) {
+	if entity.vel.y > 0 {
+		entity.y = static.y - entity.height
+		entity.flags += {.Grounded}
+	} else {
+		entity.y = static.y + static.height
+	}
+	entity.vel.y = 0
+
+}
+
+resolve_entity_vs_static_x :: proc(entity: ^Entity, static: Rect) {
+	if entity.vel.x > 0 {
+		entity.x = static.x - entity.width
+	} else {
+		entity.x = static.x + static.width
+	}
+	entity.vel.x = 0
 }
 
 raycast :: proc(start, magnitude: Vec2, targets: []Rect, allocator := context.temp_allocator) -> (hits: []Vec2, ok: bool) {
